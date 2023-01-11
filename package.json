@@ -1,0 +1,13 @@
+{
+  "name": "sshTerminal",
+  "version": "1.0.0",
+  "description": "terminalssh",
+  "main": "index.js",
+  "author": "gezer",
+  "license": "MIT",
+  "dependencies": {
+    "socket.io": "^4.5.4",
+    "ssh2": "^1.11.0",
+    "xterm": "^3.12.1"
+  }
+}
