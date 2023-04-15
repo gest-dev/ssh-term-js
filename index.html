@@ -1,70 +1,82 @@
 <html>
-
-<head>
-    <title>SSH Terminal</title>
-    <link rel="stylesheet" href="xterm.css" />
-    <script src="xterm.js"></script>
-    <script src="addons/fit/fit.js"></script>
+  <head>
+    <title>SSH - Socket io, Express and Xterm.</title>
+    <link rel="stylesheet" href="assets/xterm/dist/xterm.css" />
+    <script src="assets/xterm/dist/xterm.js"></script>
+    <script src="assets/xterm/dist/addons/fit/fit.js"></script>
     <script src="socket.io/socket.io.js"></script>
+    <!--  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script> -->
     <script>
-        window.addEventListener('load', function () {
-            var terminalContainer = document.getElementById('terminal-container');
-            var term = new Terminal({ cursorBlink: true });
-            term.open(terminalContainer);
-            //term.fit();
+      window.addEventListener(
+        "load",
+        function () {
+          var terminalContainer = document.getElementById("terminal-container");
+          var term = new Terminal({ cursorBlink: true });
+          term.open(terminalContainer);
+          //term.fit();
 
-            var socket = io.connect();
-            socket.on('connect', function () {
-                term.write('\r\n*** Connected to backend***\r\n');
-
-                // Browser -> Backend
-                term.on('data', function (data) {
-                    socket.emit('data', data);
-                });
-
-                // Backend -> Browser
-                socket.on('data', function (data) {
-                    term.write(data);
-                });
-
-                socket.on('disconnect', function () {
-                    term.write('\r\n*** Disconnected from backend***\r\n');
-                });
+          var socket = io.connect(); //caso queira passar uma url de algum lugar passe assim  io.connect('url aqui')
+          socket.on("connect", function () {
+            term.write("\r\n*** Connected to backend***\r\n");
+            let init_term = socket.emit("initterm", {
+              token: "ituckyssh",
             });
-        }, false);
+            if (init_term?.connected) {
+              console.log(init_term);
+
+              // Browser -> Backend
+              //not change name event
+              term.on("data", function (data) {
+                socket.emit("term", data);
+              });
+
+              // Backend -> Browser
+              socket.on("term", function (data) {
+                term.write(data);
+              });
+
+              socket.on("disconnect", function () {
+                term.write("\r\n*** Disconnected from backend***\r\n");
+              });
+            } else {
+              term.write("\r\n*** Disconnected from backend***\r\n");
+            }
+          });
+        },
+        false
+      );
     </script>
     <style>
-        body {
-            font-family: helvetica, sans-serif, arial;
-            font-size: 1em;
-            color: #111;
-        }
+      body {
+        font-family: helvetica, sans-serif, arial;
+        font-size: 1em;
+        color: #111;
+      }
 
-        h1 {
-            text-align: center;
-        }
+      h1 {
+        text-align: center;
+      }
 
-        #terminal-container {
-            width: 100%;
-            height: 600px;
-            margin: 0 auto;
-            padding: 2px;
-        }
+      #terminal-container {
+        width: 100%;
+        height: 600px;
+        margin: 0 auto;
+        padding: 2px;
+      }
 
-        #terminal-container .terminal {
-            background-color: #111;
-            color: #fafafa;
-            padding: 2px;
-        }
+      #terminal-container .terminal {
+        background-color: #111;
+        color: #fafafa;
+        padding: 2px;
+      }
 
-        #terminal-container .terminal:focus .terminal-cursor {
-            background-color: #fafafa;
-        }
+      #terminal-container .terminal:focus .terminal-cursor {
+        background-color: #fafafa;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <div id="terminal-container"></div>
-</body>
-
+  </body>
 </html>

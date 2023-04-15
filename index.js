@@ -1,68 +1,119 @@
-var fs = require('fs');
-var path = require('path');
-var server = require('http').createServer(onRequest);
+const app = require("express")();
+const http = require("http").Server(app);
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const express = require("express");
 
-var io = require('socket.io')(server);
-var SSHClient = require('ssh2').Client;
-
-// Load static files into memory
-var staticFiles = {};
-var basePath = path.join(require.resolve('xterm'), '..');
-
-['addons/fit/fit.js',
-    'xterm.css',
-    'xterm.js'
-].forEach(function (f) {
-
-    staticFiles['/' + f] = fs.readFileSync(path.join(basePath, `../../dist/${f}`));
+var io = require("socket.io")(http, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
 });
 
-staticFiles['/'] = fs.readFileSync('index.html');
+var SSHClient = require("ssh2").Client;
 
-// Handle static file serving
-function onRequest(req, res) {
-    var file;
+app.use(bodyParser.json({ limit: "50mb" }));
+app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
+// Config CORS and JSON response
 
+app.use(cors());
+app.use(express.json());
+// Delivering static files
+app.use("/assets", express.static("public"));
+//app.use(helmet());
+app.get("/term", function (req, res) {
+  res.status(200);
+  res.sendFile(__dirname + "/index.html");
+});
 
-    if (req.method === 'GET' && (file = staticFiles[req.url])) {
-        res.writeHead(200, {
-            'Content-Type': 'text/'
-                + (/css$/.test(req.url)
-                    ? 'css'
-                    : (/js$/.test(req.url) ? 'javascript' : 'html'))
-        });
-        return res.end(file);
-    }
-    res.writeHead(404);
-    res.end();
-}
-
-io.on('connection', function (socket) {
-    var conn = new SSHClient();
-    conn.on('ready', function () {
-        socket.emit('data', '\r\n*** SSH CONNECTION ESTABLISHED ***\r\n');
-        conn.shell(function (err, stream) {
+io.on("connection", function (socket) {
+  socket.on("initterm", function (datareq) {
+    console.log(datareq);
+    if (datareq.token === "ituckyssh") {
+      //ssh cliente
+      var conn = new SSHClient();
+      conn
+        .on("ready", function () {
+          //teste com front vue
+          socket.emit("term", "\r\n*** CONEXÃO SSH ESTABELECIDA ***\r\n");
+          conn.shell(function (err, stream) {
             if (err)
-                return socket.emit('data', '\r\n*** SSH SHELL ERROR: ' + err.message + ' ***\r\n');
-            socket.on('data', function (data) {
-                stream.write(data);
+              return socket.emit(
+                "term",
+                "\r\n*** ERRO SSH SHELL: " + err.message + " ***\r\n"
+              );
+            socket.on("term", function (data) {
+              stream.write(data);
             });
-            stream.on('data', function (d) {
-                socket.emit('data', d.toString('binary'));
-            }).on('close', function () {
+            //not change name event
+            stream
+              .on("data", function (d) {
+                socket.emit("term", d.toString("binary"));
+              })
+              .on("close", function () {
                 conn.end();
-            });
+              });
+          });
+        })
+        .on("close", function () {
+          socket.emit("term", "\r\n*** CONEXÃO SSH FECHADA ***\r\n");
+        })
+        .on("error", function (err) {
+          socket.emit(
+            "term",
+            "\r\n*** ERRO DE CONEXÃO SSH: " + err.message + " ***\r\n"
+          );
+        })
+        .connect({
+          host: "172.16.0.10", //ip
+          port: "22",
+          username: "itucky",
+          password: "5895]311",
         });
-    }).on('close', function () {
-        socket.emit('data', '\r\n*** SSH CONNECTION CLOSED ***\r\n');
-    }).on('error', function (err) {
-        socket.emit('data', '\r\n*** SSH CONNECTION ERROR: ' + err.message + ' ***\r\n');
-    }).connect({
-        host: '0.0.0.0',//ipserver
-        port: '2233',
-        username: 'username',
-        password: 'password'
+    } else {
+      socket.emit("term", "\r\n*** DADOS INCORRETOS ***\r\n");
+    }
+    /* {
+        host: "172.16.0.10", //ip
+        port: "22",
+        username: "itucky",
+        password: "5895]311",
+      } */
+    socket.setMaxListeners(0);
+  });
+
+  //test fornt vue
+  setInterval(function () {
+    const data = {
+      date: new Date(),
+      message: "Mensagem enviada pelo servidor!",
+    };
+    socket.emit("server-message", data);
+    socket.on("server-message", function (data) {
+      console.log(data);
     });
+  }, 5000);
 });
-console.log("http://localhost:8000");
-server.listen(8000);
+
+app.get("/", function (req, res) {
+  res.status(200);
+  res.sendFile(__dirname + "/welcome.html");
+});
+app.use((req, res, next) => {
+  const bomba = new Error("Error when requesting page!");
+  bomba.status = 404;
+  return next(bomba);
+});
+app.use((err, req, res, next) => {
+  res.status(err.status || 500);
+  res.send({
+    error: {
+      Mensgaem: err.message,
+    },
+  });
+});
+
+http.listen(8000, () => {
+  console.log("http://localhost:8000");
+});
